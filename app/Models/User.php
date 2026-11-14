@@ -89,7 +89,47 @@ class User extends Authenticatable implements FilamentUser, HasTenants, HasAvata
 
     public function isPlatformAdmin(): bool
     {
-        return $this->is_platform_admin;
+        return (bool) $this->is_platform_admin;
+    }
+
+    public function isGymOwner(?Gym $gym = null): bool
+    {
+        if ($this->is_platform_admin) {
+            return false;
+        }
+
+        if ($gym) {
+            return $gym->owner_email === $this->email;
+        }
+
+        return Gym::where('owner_email', $this->email)->exists();
+    }
+
+    public function isStaff(?Gym $gym = null): bool
+    {
+        if ($this->is_platform_admin || $this->isGymOwner($gym)) {
+            return false;
+        }
+
+        if ($gym) {
+            return (int) $this->gym_id === (int) $gym->getKey();
+        }
+
+        return $this->gym_id !== null;
+    }
+
+    public function hasRole(string|array $roles): bool
+    {
+        $roles = (array) $roles;
+        $currentRole = strtolower($this->getRoleName());
+
+        foreach ($roles as $role) {
+            if ($currentRole === strtolower(trim($role))) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function getRoleName(): string

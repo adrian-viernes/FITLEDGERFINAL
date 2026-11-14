@@ -12,8 +12,19 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        $middleware->append(\App\Http\Middleware\SecurityHeaders::class);
+
+        $middleware->validateCsrfTokens(except: [
+            'api/*',
+            'webhooks/*',
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        $exceptions->render(function (\Illuminate\Database\QueryException $e, \Illuminate\Http\Request $request) {
+            if ($request->expectsJson() || $request->is('api/*')) {
+                return response()->json([
+                    'message' => 'A secure database service error occurred. Please try again later.',
+                ], 500);
+            }
+        });
     })->create();

@@ -50,6 +50,8 @@ class MemberPortalController extends Controller
      */
     public function showPass(string $qrCode): View
     {
+        abort_if(! preg_match('/^[a-zA-Z0-9_\-]{3,64}$/', $qrCode), 404);
+
         $member = Member::query()
             ->with([
                 'gym',
@@ -84,6 +86,8 @@ class MemberPortalController extends Controller
      */
     public function pay(string $qrCode, PayMongoService $payMongo): RedirectResponse
     {
+        abort_if(! preg_match('/^[a-zA-Z0-9_\-]{3,64}$/', $qrCode), 404);
+
         $member = Member::where('qr_code', $qrCode)->firstOrFail();
         $outstanding = $member->outstandingSubscription();
 

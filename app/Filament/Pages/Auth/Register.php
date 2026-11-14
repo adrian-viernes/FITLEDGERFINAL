@@ -12,6 +12,7 @@ use Filament\Pages\Auth\Register as BaseRegister;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\RateLimiter;
 
 class Register extends BaseRegister
 {
@@ -41,7 +42,20 @@ class Register extends BaseRegister
 
     public function register(): ?RegistrationResponse
     {
+        $throttleKey = 'register|' . request()->ip();
+        if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
+            $seconds = RateLimiter::availableIn($throttleKey);
+            Notification::make()
+                ->title('Too many attempts')
+                ->body("Please wait {$seconds} seconds before attempting to register again.")
+                ->danger()
+                ->send();
+
+            return null;
+        }
+
         $data = $this->form->getState();
+        RateLimiter::hit($throttleKey, 120);
 
         // Generate 6-digit OTP code
         $otpCode = (string) random_int(100000, 999999);
@@ -86,14 +100,23 @@ class Register extends BaseRegister
             return null;
         }
 
+        $otpThrottleKey = 'reg_otp_verify|' . md5($this->pendingRegistrationData['email']) . '|' . request()->ip();
+        if (RateLimiter::tooManyAttempts($otpThrottleKey, 5)) {
+            $seconds = RateLimiter::availableIn($otpThrottleKey);
+            $this->addError('otp', "Too many incorrect verification attempts. Please wait {$seconds} seconds.");
+            return null;
+        }
+
         $cacheKey = 'reg_otp_' . md5($this->pendingRegistrationData['email']);
         $cached = Cache::get($cacheKey);
 
         if (! $cached || $cached['code'] !== trim($this->otp)) {
+            RateLimiter::hit($otpThrottleKey, 120);
             $this->addError('otp', 'The verification code is invalid or has expired.');
             return null;
         }
 
+        RateLimiter::clear($otpThrottleKey);
         Cache::forget($cacheKey);
 
         // Create the user
@@ -118,6 +141,18 @@ class Register extends BaseRegister
         if (! $this->pendingRegistrationData) {
             return;
         }
+
+        $resendKey = 'reg_otp_resend|' . md5($this->pendingRegistrationData['email']) . '|' . request()->ip();
+        if (RateLimiter::tooManyAttempts($resendKey, 3)) {
+            $seconds = RateLimiter::availableIn($resendKey);
+            Notification::make()
+                ->title('Please wait')
+                ->body("Please wait {$seconds} seconds before requesting another code.")
+                ->warning()
+                ->send();
+            return;
+        }
+        RateLimiter::hit($resendKey, 60);
 
         $data = $this->pendingRegistrationData;
         $otpCode = (string) random_int(100000, 999999);

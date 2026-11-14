@@ -13,3 +13,9 @@ Schedule::command('fitledger:check-dues')
     ->timezone('Asia/Manila')
     ->withoutOverlapping()
     ->onOneServer();
+
+// Automated Daily Database Backup (OWASP / Security Prevention #8)
+Schedule::command('db:backup')
+    ->dailyAt('02:00')
+    ->timezone('Asia/Manila')
+    ->withoutOverlapping();

@@ -11,6 +11,8 @@ use Filament\Pages\Auth\Login as BaseLogin;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Str;
 
 class Login extends BaseLogin
 {
@@ -45,13 +47,35 @@ class Login extends BaseLogin
     public function authenticate(): ?LoginResponse
     {
         $data = $this->form->getState();
+        $throttleKey = Str::transliterate(Str::lower($data['email']) . '|' . request()->ip());
+
+        // Limit login attempts to prevent brute-force attacks (OWASP A07)
+        if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
+            $seconds = RateLimiter::availableIn($throttleKey);
+
+            Notification::make()
+                ->title('Too many login attempts')
+                ->body("Too many failed login attempts. Please try again in {$seconds} seconds.")
+                ->danger()
+                ->send();
+
+            $this->addError('email', trans('auth.throttle', [
+                'seconds' => $seconds,
+                'minutes' => ceil($seconds / 60),
+            ]));
+
+            return null;
+        }
 
         /** @var User|null $user */
         $user = User::query()->where('email', $data['email'])->first();
 
         if (! $user || ! Hash::check($data['password'], $user->password)) {
+            RateLimiter::hit($throttleKey, 60);
             $this->throwFailureValidationException();
         }
+
+        RateLimiter::clear($throttleKey);
 
         if (! $user->is_active) {
             Notification::make()
@@ -97,13 +121,23 @@ class Login extends BaseLogin
             'otp' => ['required', 'string', 'size:6'],
         ]);
 
+        $otpThrottleKey = 'otp_verify|' . $this->pendingUserId . '|' . request()->ip();
+
+        if (RateLimiter::tooManyAttempts($otpThrottleKey, 5)) {
+            $seconds = RateLimiter::availableIn($otpThrottleKey);
+            $this->addError('otp', "Too many incorrect verification attempts. Please wait {$seconds} seconds.");
+            return null;
+        }
+
         $cachedCode = Cache::get('auth_otp_' . $this->pendingUserId);
 
         if (! $cachedCode || $cachedCode !== trim($this->otp)) {
+            RateLimiter::hit($otpThrottleKey, 120);
             $this->addError('otp', 'The verification code is invalid or has expired.');
             return null;
         }
 
+        RateLimiter::clear($otpThrottleKey);
         Cache::forget('auth_otp_' . $this->pendingUserId);
 
         Filament::auth()->loginUsingId($this->pendingUserId, $this->rememberMe);
@@ -117,6 +151,18 @@ class Login extends BaseLogin
         if (! $this->pendingUserId) {
             return;
         }
+
+        $resendKey = 'otp_resend|' . $this->pendingUserId . '|' . request()->ip();
+        if (RateLimiter::tooManyAttempts($resendKey, 3)) {
+            $seconds = RateLimiter::availableIn($resendKey);
+            Notification::make()
+                ->title('Please wait')
+                ->body("Please wait {$seconds} seconds before requesting another code.")
+                ->warning()
+                ->send();
+            return;
+        }
+        RateLimiter::hit($resendKey, 60);
 
         $user = User::find($this->pendingUserId);
         if (! $user) {
