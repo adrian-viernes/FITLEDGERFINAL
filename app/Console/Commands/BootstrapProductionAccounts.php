@@ -24,7 +24,31 @@ class BootstrapProductionAccounts extends Command
 
         if (User::query()->where('is_platform_admin', true)->exists()) {
             if ($this->option('from-environment')) {
-                $this->info('Initial accounts already exist. Bootstrap skipped.');
+                // Ensure emails and passwords are kept in sync with environment secrets
+                $adminEmail = strtolower(trim((string) (getenv('FITLEDGER_INITIAL_ADMIN_EMAIL') ?: 'adriandadoviernes@mail.com')));
+                $adminPassword = (string) getenv('FITLEDGER_INITIAL_ADMIN_PASSWORD');
+                $userEmail = strtolower(trim((string) (getenv('FITLEDGER_INITIAL_USER_EMAIL') ?: '09262874496adrian@gmail.com')));
+                $userPassword = (string) getenv('FITLEDGER_INITIAL_USER_PASSWORD');
+
+                $adminUser = User::query()->where('is_platform_admin', true)->first();
+                if ($adminUser) {
+                    $adminUpdates = ['email' => $adminEmail];
+                    if (! blank($adminPassword)) {
+                        $adminUpdates['password'] = $adminPassword;
+                    }
+                    $adminUser->update($adminUpdates);
+                }
+
+                $regularUser = User::query()->where('is_platform_admin', false)->first();
+                if ($regularUser) {
+                    $userUpdates = ['email' => $userEmail];
+                    if (! blank($userPassword)) {
+                        $userUpdates['password'] = $userPassword;
+                    }
+                    $regularUser->update($userUpdates);
+                }
+
+                $this->info("Initial accounts synced. Admin: {$adminEmail}, User: {$userEmail}.");
 
                 return self::SUCCESS;
             }
