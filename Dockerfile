@@ -36,6 +36,7 @@ COPY --from=assets /app/public/build ./public/build
 RUN sed -i 's|/var/www/html|/var/www/html/public|g' /etc/apache2/sites-available/000-default.conf \
     && printf '<Directory /var/www/html/public>\n    AllowOverride All\n    Require all granted\n</Directory>\n' > /etc/apache2/conf-available/laravel.conf \
     && a2enconf laravel \
+    && mkdir -p storage/app/public storage/framework/cache/data storage/framework/sessions storage/framework/views storage/logs bootstrap/cache \
     && composer install --no-dev --no-interaction --prefer-dist --no-progress --optimize-autoloader \
     && php artisan storage:link --force \
     && chown -R www-data:www-data storage bootstrap/cache
