@@ -29,19 +29,7 @@
     </div>
 
     @if (! $requiresOtp)
-        <!-- STAGE 1: CREDENTIALS SIGN-IN -->
-
-        <!-- Divider -->
-        <div class="relative">
-            <div class="absolute inset-0 flex items-center">
-                <div class="w-full border-t border-white/10"></div>
-            </div>
-            <div class="relative flex justify-center text-[11px]">
-                <span class="px-3 text-zinc-500 font-medium" style="background-color: #12151b;">or sign in with credentials</span>
-            </div>
-        </div>
-
-        <!-- Credentials Livewire Form -->
+        <!-- STAGE 1: SIGN-IN FORM -->
         <x-filament-panels::form id="form" wire:submit="authenticate">
             {{ $this->form }}
 
@@ -86,7 +74,8 @@
                     </label>
                     <input type="text" wire:model="otp" maxlength="6" autofocus
                         placeholder="123456"
-                        class="w-full text-center text-3xl font-mono font-black tracking-[0.3em] py-3.5 px-4 rounded-xl bg-[#0a0c10] border border-white/10 text-white placeholder-zinc-700 focus:border-[#FF7A00] focus:ring-1 focus:ring-[#FF7A00] transition">
+                        class="otp-input-field w-full text-center text-3xl font-mono font-black tracking-[0.3em] py-3.5 px-4 rounded-xl border border-white/10 placeholder-zinc-600 focus:border-[#FF7A00] focus:ring-1 focus:ring-[#FF7A00] transition"
+                        style="background-color: #0a0c10 !important; color: #ffffff !important; -webkit-text-fill-color: #ffffff !important;">
                     @error('otp')
                         <span class="text-xs text-rose-400 font-semibold block mt-1.5">{{ $message }}</span>
                     @enderror

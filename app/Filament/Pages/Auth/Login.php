@@ -41,7 +41,7 @@ class Login extends BaseLogin
     {
         return $this->requiresOtp 
             ? "Enter the 6-digit code sent to {$this->pendingUserEmail}" 
-            : 'Welcome back! Enter your credentials.';
+            : 'Welcome back!';
     }
 
     public function authenticate(): ?LoginResponse

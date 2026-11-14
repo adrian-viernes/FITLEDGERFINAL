@@ -217,6 +217,34 @@
         box-shadow: 0 0 0 1px #FF5722 !important;
     }
 
+    /* Force high contrast dark styling on OTP & text inputs to prevent white-on-white text */
+    input.otp-input-field,
+    .auth-split-wrapper input[type="text"],
+    .auth-split-wrapper input[type="email"],
+    .auth-split-wrapper input[type="password"],
+    html.dark input {
+        background-color: #0a0c10 !important;
+        color: #ffffff !important;
+        -webkit-text-fill-color: #ffffff !important;
+    }
+
+    input.otp-input-field::placeholder,
+    .auth-split-wrapper input::placeholder {
+        color: #52525b !important;
+        -webkit-text-fill-color: #52525b !important;
+    }
+
+    /* Handle browser autofill styling */
+    input:-webkit-autofill,
+    input:-webkit-autofill:hover,
+    input:-webkit-autofill:focus,
+    input:-webkit-autofill:active {
+        -webkit-box-shadow: 0 0 0 1000px #0a0c10 inset !important;
+        -webkit-text-fill-color: #ffffff !important;
+        caret-color: #ffffff !important;
+        transition: background-color 5000s ease-in-out 0s;
+    }
+
     /* Badges */
     .fi-badge {
         font-weight: 800 !important;
