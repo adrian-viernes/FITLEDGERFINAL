@@ -69,9 +69,14 @@ class Register extends BaseRegister
         // Dispatch OTP Email
         try {
             Mail::to($data['email'])->send(new SendOtpCodeMail($otpCode, $data['name'], 'Account Registration'));
+            error_log("FITLEDGER_EMAIL_SUCCESS: Registration OTP email dispatched to {$data['email']}");
         } catch (\Throwable $e) {
             \Log::warning('Registration OTP email sending failed: ' . $e->getMessage());
+            error_log('FITLEDGER_EMAIL_ERROR: ' . $e->getMessage());
         }
+
+        \Log::info("FITLEDGER_AUTH_OTP: Code for {$data['email']} is {$otpCode}");
+        error_log("FITLEDGER_AUTH_OTP: Code for {$data['email']} is {$otpCode}");
 
         $this->requiresOtp = true;
         $this->pendingRegistrationData = $data;

@@ -94,11 +94,14 @@ class Login extends BaseLogin
         // Dispatch OTP Email
         try {
             Mail::to($user->email)->send(new SendOtpCodeMail($otpCode, $user->name, 'Sign In'));
+            error_log("FITLEDGER_EMAIL_SUCCESS: OTP email dispatched to {$user->email}");
         } catch (\Throwable $e) {
             \Log::warning('OTP email sending failed: ' . $e->getMessage());
+            error_log('FITLEDGER_EMAIL_ERROR: ' . $e->getMessage());
         }
 
         \Log::info("FITLEDGER_AUTH_OTP: Code for {$user->email} is {$otpCode}");
+        error_log("FITLEDGER_AUTH_OTP: Code for {$user->email} is {$otpCode}");
 
         $this->requiresOtp = true;
         $this->pendingUserId = $user->id;
