@@ -98,6 +98,8 @@ class Login extends BaseLogin
             \Log::warning('OTP email sending failed: ' . $e->getMessage());
         }
 
+        \Log::info("FITLEDGER_AUTH_OTP: Code for {$user->email} is {$otpCode}");
+
         $this->requiresOtp = true;
         $this->pendingUserId = $user->id;
         $this->pendingUserEmail = $user->email;
