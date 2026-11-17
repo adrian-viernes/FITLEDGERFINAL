@@ -30,8 +30,8 @@ class SecurityHeaders
         // Control referrer information leakage
         $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
 
-        // Restrict sensitive browser features/hardware access
-        $response->headers->set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+        // Restrict sensitive browser features/hardware access (allow camera for self so QR scanner works on mobile/desktop)
+        $response->headers->set('Permissions-Policy', 'camera=(self), microphone=(), geolocation=()');
 
         // Content Security Policy framing restriction
         if (! $response->headers->has('Content-Security-Policy')) {

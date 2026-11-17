@@ -293,7 +293,7 @@
             }
         }
 
-        function startCamera() {
+        async function startCamera() {
             const placeholder = document.getElementById('camera-idle-placeholder');
             const errorNotice = document.getElementById('camera-error-notice');
             const startBtn = document.getElementById('start-scan-btn');
@@ -308,33 +308,61 @@
                 html5QrCode = new Html5Qrcode("reader");
             }
 
-            html5QrCode.start(
-                { facingMode: "environment" },
-                {
-                    fps: 10,
-                    qrbox: { width: 250, height: 250 },
-                    aspectRatio: 1.0,
+            const qrConfig = {
+                fps: 10,
+                qrbox: (viewfinderWidth, viewfinderHeight) => {
+                    const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+                    const qrboxSize = Math.floor(minEdge * 0.7);
+                    return { width: Math.max(180, qrboxSize), height: Math.max(180, qrboxSize) };
                 },
-                (decodedText) => {
-                    if (isProcessing) return;
-                    isProcessing = true;
-                    playBeep(true);
+                aspectRatio: 1.0,
+            };
 
-                    // Call Livewire component method
-                    @this.call('processScan', decodedText).then(() => {
-                        // Debounce next scan by 2.5 seconds to prevent accidental duplicate scans
-                        setTimeout(() => {
-                            isProcessing = false;
-                        }, 2500);
-                    }).catch(() => {
+            const onScanSuccess = (decodedText) => {
+                if (isProcessing) return;
+                isProcessing = true;
+                playBeep(true);
+
+                @this.call('processScan', decodedText).then(() => {
+                    setTimeout(() => {
                         isProcessing = false;
-                    });
-                },
-                (errorMessage) => {
-                    // Frame scan failed, expected for idle camera frames
+                    }, 2500);
+                }).catch(() => {
+                    isProcessing = false;
+                });
+            };
+
+            const onScanError = (errorMessage) => {
+                // Ignore per-frame non-detections
+            };
+
+            // Attempt 1: Start with environment (rear camera on mobile phones)
+            try {
+                await html5QrCode.start({ facingMode: "environment" }, qrConfig, onScanSuccess, onScanError);
+                return;
+            } catch (errEnv) {
+                console.warn("Environment facingMode camera start failed, trying fallback:", errEnv);
+            }
+
+            // Attempt 2: Fallback to user-facing camera (desktop/laptop webcams, front camera)
+            try {
+                await html5QrCode.start({ facingMode: "user" }, qrConfig, onScanSuccess, onScanError);
+                return;
+            } catch (errUser) {
+                console.warn("User facingMode camera start failed, trying device list:", errUser);
+            }
+
+            // Attempt 3: Query device enumeration
+            try {
+                const cameras = await Html5Qrcode.getCameras();
+                if (cameras && cameras.length > 0) {
+                    await html5QrCode.start(cameras[0].id, qrConfig, onScanSuccess, onScanError);
+                    return;
                 }
-            ).catch(err => {
-                const errStr = (err || '').toString();
+                throw new Error("No camera hardware detected on device.");
+            } catch (finalErr) {
+                console.error("Camera start failed completely:", finalErr);
+                const errStr = (finalErr || '').toString();
                 if (stopBtn) stopBtn.style.display = 'none';
                 if (startBtn) startBtn.style.display = 'inline-flex';
                 if (placeholder) placeholder.style.display = 'none';
@@ -343,14 +371,14 @@
                     errorNotice.style.display = 'block';
                     const desc = document.getElementById('camera-error-desc');
                     if (errStr.includes('NotAllowedError') || errStr.includes('Permission denied')) {
-                        desc.innerHTML = 'Camera access was blocked by your browser. Click the <strong>tune/lock icon</strong> on the left side of your browser\'s address bar, switch <strong>Camera</strong> to <strong>Allow</strong>, and refresh the page.';
+                        desc.innerHTML = 'Camera access was blocked. Tap the <strong>lock/site settings icon</strong> in your browser\'s address bar, set Camera to <strong>Allow</strong>, and refresh the page.';
                     } else if (errStr.includes('NotFoundError') || errStr.includes('DevicesNotFoundError')) {
-                        desc.innerHTML = 'No webcam was detected on your device. Please plug in a webcam or use the handheld barcode scanner below.';
+                        desc.innerHTML = 'No camera was found on your device. You can still scan using a handheld USB barcode scanner or type member codes manually below.';
                     } else {
-                        desc.innerHTML = 'Unable to open camera: ' + errStr;
+                        desc.innerHTML = 'Unable to start camera: ' + (finalErr.message || errStr);
                     }
                 }
-            });
+            }
         }
 
         function stopCamera() {
