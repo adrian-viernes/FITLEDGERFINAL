@@ -70,9 +70,12 @@
                                 Open Digital Pass ↗
                             </a>
                         @endif
-                        <button type="button" wire:click="clearResult"
-                            class="px-4 py-2 rounded-xl text-xs font-bold bg-white text-gray-900 hover:bg-gray-100 transition shadow">
-                            Scan Next Member
+                        <button type="button" wire:click="clearResult" onclick="resumeScanning()"
+                            class="px-4 py-2 rounded-xl text-xs font-bold bg-white text-gray-900 hover:bg-gray-100 transition shadow flex items-center justify-center gap-1.5">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                            </svg>
+                            <span>Scan Next Member</span>
                         </button>
                     </div>
                 </div>
@@ -121,6 +124,27 @@
                     <div class="relative rounded-xl overflow-hidden min-h-[300px] flex items-center justify-center"
                         style="background-color: #0a0c10; border: 1px solid rgba(255, 255, 255, 0.08);">
                         <div id="reader" class="w-full"></div>
+
+                        <!-- Scan Complete / Paused Overlay (Stops spam / continuous loop) -->
+                        <div id="camera-paused-overlay" style="display: none;" class="absolute inset-0 bg-black/85 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center z-10 animate-in fade-in zoom-in-95 duration-200">
+                            <div class="w-16 h-16 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 flex items-center justify-center mb-3 shadow-xl shadow-emerald-950/50">
+                                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+                                </svg>
+                            </div>
+                            <h4 class="text-white font-black text-lg tracking-wide">Check-In Scanned</h4>
+                            <p class="text-zinc-400 text-xs mt-1 mb-5 max-w-xs">
+                                Camera paused to prevent duplicate scans. Ready for the next member?
+                            </p>
+                            <button type="button" onclick="resumeScanning()"
+                                class="px-6 py-3 rounded-xl font-bold text-xs text-white shadow-xl transition flex items-center gap-2 hover:scale-[1.02] active:scale-[0.98]"
+                                style="background: linear-gradient(135deg, #FF6D00 0%, #FF3D00 100%);">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                                </svg>
+                                <span>Scan Next Member (Spacebar)</span>
+                            </button>
+                        </div>
 
                         <!-- Permission / Error Notice -->
                         <div id="camera-error-notice" style="display: none;" class="p-6 text-center max-w-md space-y-3">
@@ -272,6 +296,9 @@
     <script>
         let html5QrCode = null;
         let isProcessing = false;
+        let isPaused = false;
+        let lastScannedCode = null;
+        let lastScannedAt = 0;
 
         function playBeep(success = true) {
             try {
@@ -293,14 +320,47 @@
             }
         }
 
+        function resumeScanning() {
+            isProcessing = false;
+            isPaused = false;
+            lastScannedCode = null;
+
+            const pausedOverlay = document.getElementById('camera-paused-overlay');
+            if (pausedOverlay) pausedOverlay.style.display = 'none';
+
+            if (html5QrCode) {
+                try {
+                    if (typeof html5QrCode.resume === 'function') {
+                        html5QrCode.resume();
+                    }
+                } catch (e) {
+                    console.warn("Camera resume error:", e);
+                }
+            }
+        }
+
+        // Spacebar shortcut: press Space anywhere (except when typing in an input) to resume scanning
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' && document.activeElement.tagName !== 'INPUT' && isPaused) {
+                e.preventDefault();
+                resumeScanning();
+            }
+        });
+
         async function startCamera() {
             const placeholder = document.getElementById('camera-idle-placeholder');
             const errorNotice = document.getElementById('camera-error-notice');
+            const pausedOverlay = document.getElementById('camera-paused-overlay');
             const startBtn = document.getElementById('start-scan-btn');
             const stopBtn = document.getElementById('stop-scan-btn');
 
+            isProcessing = false;
+            isPaused = false;
+            lastScannedCode = null;
+
             if (placeholder) placeholder.style.display = 'none';
             if (errorNotice) errorNotice.style.display = 'none';
+            if (pausedOverlay) pausedOverlay.style.display = 'none';
             if (startBtn) startBtn.style.display = 'none';
             if (stopBtn) stopBtn.style.display = 'inline-flex';
 
@@ -319,15 +379,34 @@
             };
 
             const onScanSuccess = (decodedText) => {
-                if (isProcessing) return;
+                const now = Date.now();
+
+                // Prevent repeat scanning if already paused or same code within 6 seconds
+                if (isPaused || isProcessing) return;
+                if (decodedText === lastScannedCode && (now - lastScannedAt) < 6000) return;
+
                 isProcessing = true;
+                isPaused = true;
+                lastScannedCode = decodedText;
+                lastScannedAt = now;
+
                 playBeep(true);
 
-                @this.call('processScan', decodedText).then(() => {
-                    setTimeout(() => {
-                        isProcessing = false;
-                    }, 2500);
-                }).catch(() => {
+                // Pause camera feed immediately to stop continuous spam
+                try {
+                    if (html5QrCode && typeof html5QrCode.pause === 'function') {
+                        html5QrCode.pause(true);
+                    }
+                } catch (e) {
+                    console.warn("Pause camera error:", e);
+                }
+
+                // Show the paused overlay
+                const pausedOverlay = document.getElementById('camera-paused-overlay');
+                if (pausedOverlay) pausedOverlay.style.display = 'flex';
+
+                // Call Livewire component method
+                @this.call('processScan', decodedText).catch(() => {
                     isProcessing = false;
                 });
             };
@@ -382,12 +461,18 @@
         }
 
         function stopCamera() {
+            isProcessing = false;
+            isPaused = false;
+            lastScannedCode = null;
+
             const placeholder = document.getElementById('camera-idle-placeholder');
             const errorNotice = document.getElementById('camera-error-notice');
+            const pausedOverlay = document.getElementById('camera-paused-overlay');
             const startBtn = document.getElementById('start-scan-btn');
             const stopBtn = document.getElementById('stop-scan-btn');
 
             if (errorNotice) errorNotice.style.display = 'none';
+            if (pausedOverlay) pausedOverlay.style.display = 'none';
 
             if (html5QrCode) {
                 html5QrCode.stop().then(() => {

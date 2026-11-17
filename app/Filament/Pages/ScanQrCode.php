@@ -106,6 +106,51 @@ class ScanQrCode extends Page
             }
         }
 
+        // Prevent spam / duplicate check-in within 2 minutes for the same member
+        $recentCheckIn = CheckIn::query()
+            ->where('gym_id', $gym->id)
+            ->where('member_id', $member->id)
+            ->where('scanned_at', '>=', now()->subMinutes(2))
+            ->latest('scanned_at')
+            ->first();
+
+        if ($recentCheckIn) {
+            $this->lastResult = [
+                'success' => $recentCheckIn->status->allowsEntry(),
+                'status' => $recentCheckIn->status->value,
+                'color' => match ($recentCheckIn->status) {
+                    CheckInStatus::Active => 'success',
+                    CheckInStatus::Due => 'warning',
+                    default => 'danger',
+                },
+                'color_hex' => $recentCheckIn->status->colorHex(),
+                'title' => 'Already Checked In',
+                'message' => "{$member->name} was already checked in at {$recentCheckIn->scanned_at->format('g:i:s A')} ({$recentCheckIn->scanned_at->diffForHumans()}). Duplicate check-in prevented.",
+                'member' => [
+                    'id' => $member->id,
+                    'name' => $member->name,
+                    'phone' => $member->phone,
+                    'qr_code' => $member->qr_code,
+                    'pass_url' => $member->passUrl(),
+                ],
+                'subscription' => $recentCheckIn->subscription ? [
+                    'plan' => $recentCheckIn->subscription->plan?->name,
+                    'ends_at' => $recentCheckIn->subscription->ends_at->format('M j, Y'),
+                    'amount_due' => $recentCheckIn->subscription->amountDue(),
+                ] : null,
+                'timestamp' => $recentCheckIn->scanned_at->format('h:i:s A'),
+            ];
+
+            Notification::make()
+                ->title('Already checked in')
+                ->body("{$member->name} already checked in {$recentCheckIn->scanned_at->diffForHumans()}.")
+                ->warning()
+                ->send();
+
+            $this->manualCode = '';
+            return;
+        }
+
         $checkIn = CheckIn::create([
             'gym_id' => $gym->id,
             'member_id' => $member->id,
