@@ -121,6 +121,23 @@
                     <div class="relative rounded-xl overflow-hidden min-h-[300px] flex items-center justify-center"
                         style="background-color: #0a0c10; border: 1px solid rgba(255, 255, 255, 0.08);">
                         <div id="reader" class="w-full"></div>
+
+                        <!-- Permission / Error Notice -->
+                        <div id="camera-error-notice" style="display: none;" class="p-6 text-center max-w-md space-y-3">
+                            <div class="w-14 h-14 mx-auto rounded-2xl flex items-center justify-center text-rose-400 bg-rose-500/10 border border-rose-500/30">
+                                <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
+                                </svg>
+                            </div>
+                            <div class="text-sm font-bold text-rose-300" id="camera-error-title">Camera Permission Blocked</div>
+                            <p class="text-xs text-zinc-400" id="camera-error-desc">
+                                Your browser or system blocked camera access. Click the site settings icon in your browser's address bar, set Camera to <strong>Allow</strong>, and refresh the page.
+                            </p>
+                            <button type="button" onclick="startCamera()" class="px-4 py-2 rounded-xl text-xs font-bold bg-white/10 hover:bg-white/20 text-white transition border border-white/20">
+                                Try Again
+                            </button>
+                        </div>
+
                         <div id="camera-idle-placeholder" class="text-center p-8 space-y-3">
                             <div class="w-16 h-16 mx-auto rounded-2xl flex items-center justify-center text-zinc-400"
                                 style="background-color: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08);">
@@ -278,10 +295,12 @@
 
         function startCamera() {
             const placeholder = document.getElementById('camera-idle-placeholder');
+            const errorNotice = document.getElementById('camera-error-notice');
             const startBtn = document.getElementById('start-scan-btn');
             const stopBtn = document.getElementById('stop-scan-btn');
 
             if (placeholder) placeholder.style.display = 'none';
+            if (errorNotice) errorNotice.style.display = 'none';
             if (startBtn) startBtn.style.display = 'none';
             if (stopBtn) stopBtn.style.display = 'inline-flex';
 
@@ -315,22 +334,47 @@
                     // Frame scan failed, expected for idle camera frames
                 }
             ).catch(err => {
-                alert("Unable to start camera: " + err);
-                stopCamera();
+                const errStr = (err || '').toString();
+                if (stopBtn) stopBtn.style.display = 'none';
+                if (startBtn) startBtn.style.display = 'inline-flex';
+                if (placeholder) placeholder.style.display = 'none';
+
+                if (errorNotice) {
+                    errorNotice.style.display = 'block';
+                    const desc = document.getElementById('camera-error-desc');
+                    if (errStr.includes('NotAllowedError') || errStr.includes('Permission denied')) {
+                        desc.innerHTML = 'Camera access was blocked by your browser. Click the <strong>tune/lock icon</strong> on the left side of your browser\'s address bar, switch <strong>Camera</strong> to <strong>Allow</strong>, and refresh the page.';
+                    } else if (errStr.includes('NotFoundError') || errStr.includes('DevicesNotFoundError')) {
+                        desc.innerHTML = 'No webcam was detected on your device. Please plug in a webcam or use the handheld barcode scanner below.';
+                    } else {
+                        desc.innerHTML = 'Unable to open camera: ' + errStr;
+                    }
+                }
             });
         }
 
         function stopCamera() {
             const placeholder = document.getElementById('camera-idle-placeholder');
+            const errorNotice = document.getElementById('camera-error-notice');
             const startBtn = document.getElementById('start-scan-btn');
             const stopBtn = document.getElementById('stop-scan-btn');
+
+            if (errorNotice) errorNotice.style.display = 'none';
 
             if (html5QrCode) {
                 html5QrCode.stop().then(() => {
                     if (placeholder) placeholder.style.display = 'block';
                     if (startBtn) startBtn.style.display = 'inline-flex';
                     if (stopBtn) stopBtn.style.display = 'none';
-                }).catch(() => {});
+                }).catch(() => {
+                    if (placeholder) placeholder.style.display = 'block';
+                    if (startBtn) startBtn.style.display = 'inline-flex';
+                    if (stopBtn) stopBtn.style.display = 'none';
+                });
+            } else {
+                if (placeholder) placeholder.style.display = 'block';
+                if (startBtn) startBtn.style.display = 'inline-flex';
+                if (stopBtn) stopBtn.style.display = 'none';
             }
         }
     </script>
