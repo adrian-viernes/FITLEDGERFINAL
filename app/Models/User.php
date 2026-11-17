@@ -5,6 +5,7 @@ namespace App\Models;
 use Database\Factories\UserFactory;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Models\Contracts\HasAvatar;
+use Filament\Models\Contracts\HasDefaultTenant;
 use Filament\Models\Contracts\HasTenants;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -15,7 +16,7 @@ use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 
-class User extends Authenticatable implements FilamentUser, HasTenants, HasAvatar
+class User extends Authenticatable implements FilamentUser, HasTenants, HasDefaultTenant, HasAvatar
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
@@ -71,6 +72,18 @@ class User extends Authenticatable implements FilamentUser, HasTenants, HasAvata
             ->orWhere('id', $this->gym_id)
             ->orderBy('name')
             ->get();
+    }
+
+    public function getDefaultTenant(Panel $panel): ?Model
+    {
+        if ($this->is_platform_admin) {
+            return Gym::where('slug', 'bakal-pawis-diliman')->first()
+                ?? Gym::orderBy('name')->first();
+        }
+
+        return $this->gym
+            ?? Gym::where('owner_email', $this->email)->first()
+            ?? Gym::where('id', $this->gym_id)->first();
     }
 
     public function canAccessTenant(Model $tenant): bool

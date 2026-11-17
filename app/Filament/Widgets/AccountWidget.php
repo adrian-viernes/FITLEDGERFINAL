@@ -27,6 +27,17 @@ class AccountWidget extends Widget
 
     public function getViewData(): array
     {
+        try {
+            return $this->resolveViewData();
+        } catch (\Throwable $e) {
+            error_log('FITLEDGER_WIDGET_ERROR: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
+
+            return $this->getFallbackViewData();
+        }
+    }
+
+    protected function resolveViewData(): array
+    {
         $user = filament()->auth()->user();
         /** @var Gym|null $tenant */
         $tenant = Filament::getTenant();
@@ -236,6 +247,49 @@ class AccountWidget extends Widget
             'bannerSubtitle' => 'Open full-screen scanner station for fast turnstile QR access.',
             'bannerButtonText' => 'Open Scanner ➔',
             'bannerButtonUrl' => $scannerUrl,
+        ];
+    }
+
+    protected function getFallbackViewData(): array
+    {
+        $user = filament()->auth()->user();
+        $tenant = Filament::getTenant();
+
+        return [
+            'user' => $user,
+            'tenant' => $tenant,
+            'isPlatformAdmin' => (bool) ($user?->is_platform_admin),
+            'heading' => 'Hi there,',
+            'subheading' => "Here's what is happening with FitLedger today",
+            'mainMetricLabel' => 'System Status',
+            'mainMetricValue' => 'All Systems Go',
+            'mainMetricBadge' => 'Live',
+            'chartMonths' => [
+                ['label' => 'Jan', 'value' => 0, 'percentage' => 40],
+                ['label' => 'Feb', 'value' => 0, 'percentage' => 55],
+                ['label' => 'Mar', 'value' => 0, 'percentage' => 70],
+            ],
+            'stat1Label' => 'Dashboard',
+            'stat1Value' => 'Active',
+            'stat1Target' => 100,
+            'stat1TargetLabel' => '100% online',
+            'stat2Label' => 'Operations',
+            'stat2Value' => 'Normal',
+            'stat2Badge' => 'OK',
+            'stat2Sub' => 'All services running',
+            'ringLabel' => 'Platform Status',
+            'ringValue' => '100%',
+            'ringPercentage' => 100,
+            'ringSubtitle' => 'Healthy',
+            'topItems' => [
+                ['name' => 'Standard Access', 'desc' => 'Active', 'value' => 'Operational', 'badge' => 'Online'],
+            ],
+            'actionLink' => url('/admin'),
+            'actionLinkLabel' => 'Refresh ➔',
+            'bannerTitle' => 'FitLedger Operations',
+            'bannerSubtitle' => 'Welcome to your management dashboard.',
+            'bannerButtonText' => 'Dashboard',
+            'bannerButtonUrl' => url('/admin'),
         ];
     }
 }

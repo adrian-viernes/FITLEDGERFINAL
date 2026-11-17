@@ -20,6 +20,10 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        $exceptions->report(function (\Throwable $e) {
+            error_log('FITLEDGER_SERVER_EXCEPTION: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
+        });
+
         $exceptions->render(function (\Illuminate\Database\QueryException $e, \Illuminate\Http\Request $request) {
             if ($request->expectsJson() || $request->is('api/*')) {
                 return response()->json([
