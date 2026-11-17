@@ -219,7 +219,7 @@ class FilipinoGymDataSeeder extends Seeder
                     'address' => 'San Antonio Village, Pasig City',
                     'emergency_contact_name' => 'Lito Macaraeg',
                     'emergency_contact_phone' => '09281112233',
-                    'status' => MemberStatus::Expired,
+                    'status' => MemberStatus::Inactive,
                 ],
                 [
                     'first_name' => 'Princess',
@@ -272,7 +272,7 @@ class FilipinoGymDataSeeder extends Seeder
 
                 // Assign Subscriptions
                 $chosenPlan = $createdPlans[$mIndex % count($createdPlans)];
-                $isExpired = $mData['status'] === MemberStatus::Expired;
+                $isExpired = $mData['status'] === MemberStatus::Inactive;
                 $startsAt = $isExpired ? now()->subDays(60) : now()->subDays(rand(2, 20));
                 $endsAt = $isExpired ? now()->subDays(30) : now()->addDays(rand(10, 45));
 
