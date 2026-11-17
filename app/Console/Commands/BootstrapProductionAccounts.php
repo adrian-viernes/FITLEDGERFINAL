@@ -51,11 +51,10 @@ class BootstrapProductionAccounts extends Command
                 $this->info("Initial accounts synced. Admin: {$adminEmail}, User: {$userEmail}.");
                 error_log("FITLEDGER_ACCOUNTS_SYNCED: Admin={$adminEmail}, User={$userEmail}");
 
-                // Populate Filipino demographic demo data if gym table is empty
-                if (\App\Models\Gym::count() === 0) {
-                    $this->info('Seeding initial Filipino gyms, members, and plans...');
-                    $this->call(\Database\Seeders\FilipinoGymDataSeeder::class);
-                }
+                $this->info('Populating Filipino gyms, members, and classes...');
+                error_log('FITLEDGER_SEEDING_START: Seeding Filipino gyms, members, classes');
+                $this->call(\Database\Seeders\FilipinoGymDataSeeder::class);
+                error_log('FITLEDGER_SEEDING_COMPLETE: Filipino gyms, members, classes seeded successfully');
 
                 return self::SUCCESS;
             }
