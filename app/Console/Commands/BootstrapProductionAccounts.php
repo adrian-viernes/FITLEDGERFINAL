@@ -25,7 +25,7 @@ class BootstrapProductionAccounts extends Command
         if (User::query()->where('is_platform_admin', true)->exists()) {
             if ($this->option('from-environment')) {
                 // Ensure emails and passwords are kept in sync with environment secrets
-                $adminEmail = strtolower(trim((string) (getenv('FITLEDGER_INITIAL_ADMIN_EMAIL') ?: 'adriandadoviernes@mail.com')));
+                $adminEmail = strtolower(trim((string) (getenv('FITLEDGER_INITIAL_ADMIN_EMAIL') ?: 'adriandadoviernes@gmail.com')));
                 $adminPassword = (string) getenv('FITLEDGER_INITIAL_ADMIN_PASSWORD');
                 $userEmail = strtolower(trim((string) (getenv('FITLEDGER_INITIAL_USER_EMAIL') ?: '09262874496adrian@gmail.com')));
                 $userPassword = (string) getenv('FITLEDGER_INITIAL_USER_PASSWORD');
@@ -49,6 +49,7 @@ class BootstrapProductionAccounts extends Command
                 }
 
                 $this->info("Initial accounts synced. Admin: {$adminEmail}, User: {$userEmail}.");
+                error_log("FITLEDGER_ACCOUNTS_SYNCED: Admin={$adminEmail}, User={$userEmail}");
 
                 return self::SUCCESS;
             }
